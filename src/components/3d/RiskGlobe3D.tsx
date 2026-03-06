@@ -74,7 +74,7 @@ function GlobeCore() {
 
 function RiskHotspot({ data }: { data: HotspotData }) {
   const pos = latLngToVec3(data.lat, data.lng, 1.55);
-  const ref = useRef<THREE.Group>(null);
+  const ref = useRef<THREE.Mesh>(null!);
 
   const color = useMemo(() => {
     if (data.risk > 60) return new THREE.Color("hsl(0, 72%, 63%)");
@@ -180,7 +180,7 @@ export default function RiskGlobe3D() {
           {hotspots.map((h) => (
             <RiskHotspot key={h.label} data={h} />
           ))}
-          <ConnectionLines />
+          <ConnectionArcs />
           <OrbitalRing />
         </Float>
 
