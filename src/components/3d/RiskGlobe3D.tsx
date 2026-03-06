@@ -122,52 +122,34 @@ function RiskHotspot({ data }: { data: HotspotData }) {
   );
 }
 
-function ConnectionLines() {
-  const ref = useRef<THREE.Group>(null);
-
-  const lines = useMemo(() => {
-    const result: { start: THREE.Vector3; end: THREE.Vector3 }[] = [];
+function ConnectionArcs() {
+  const arcs = useMemo(() => {
+    const result: THREE.BufferGeometry[] = [];
     for (let i = 0; i < hotspots.length - 1; i++) {
       if (hotspots[i].risk > 40 && hotspots[i + 1].risk > 40) {
-        result.push({
-          start: latLngToVec3(hotspots[i].lat, hotspots[i].lng, 1.56),
-          end: latLngToVec3(hotspots[i + 1].lat, hotspots[i + 1].lng, 1.56),
-        });
+        const start = latLngToVec3(hotspots[i].lat, hotspots[i].lng, 1.56);
+        const end = latLngToVec3(hotspots[i + 1].lat, hotspots[i + 1].lng, 1.56);
+        const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+        mid.normalize().multiplyScalar(2.2);
+        const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+        const points = curve.getPoints(32);
+        result.push(new THREE.BufferGeometry().setFromPoints(points));
       }
     }
     return result;
   }, []);
 
-  useFrame((state) => {
-    if (ref.current) {
-      ref.current.children.forEach((child, i) => {
-        const mat = (child as THREE.Line).material as THREE.LineBasicMaterial;
-        if (mat) mat.opacity = Math.sin(state.clock.elapsedTime * 1.5 + i) * 0.15 + 0.2;
-      });
-    }
-  });
-
   return (
-    <group ref={ref}>
-      {lines.map((line, i) => {
-        const mid = new THREE.Vector3().addVectors(line.start, line.end).multiplyScalar(0.5);
-        mid.normalize().multiplyScalar(2.2);
-        const curve = new THREE.QuadraticBezierCurve3(line.start, mid, line.end);
-        const points = curve.getPoints(32);
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-
-        return (
-          <line key={i} geometry={geometry}>
-            <lineBasicMaterial color="#1F6FEB" transparent opacity={0.25} />
-          </line>
-        );
-      })}
+    <group>
+      {arcs.map((geo, i) => (
+        <primitive key={i} object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: "#1F6FEB", transparent: true, opacity: 0.25 }))} />
+      ))}
     </group>
   );
 }
 
 function OrbitalRing() {
-  const ref = useRef<THREE.Mesh>(null);
+  const ref = useRef<THREE.Mesh>(null!);
   useFrame((state) => {
     if (ref.current) ref.current.rotation.z = state.clock.elapsedTime * 0.1;
   });
