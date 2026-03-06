@@ -1,7 +1,9 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { RiskBadge } from "@/components/dashboard/RiskBadge";
-import { containers, weeklyTrend } from "@/data/mockData";
+import { type Container } from "@/data/mockData";
+import { fetchOverviewStats, fetchROI, fetchCriticalContainers, fetchTrends } from "@/lib/apiClient";
+import { useEffect, useState } from "react";
 import { Package, AlertTriangle, AlertCircle, CheckCircle, DollarSign } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { motion } from "framer-motion";
@@ -16,7 +18,39 @@ const pieData = [
 ];
 
 const Index = () => {
-  const criticalContainers = containers.filter(c => c.riskLevel === "Critical");
+  const [stats, setStats] = useState({ total: 0, critical: 0, lowRisk: 0, clear: 0 });
+  const [roi, setRoi] = useState({ hoursSaved: 0, wagesSaved: 0, avoidanceRate: 0 });
+  const [criticalContainers, setCriticalContainers] = useState<Container[]>([]);
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [statsData, roiData, containersData, trendResponse] = await Promise.all([
+          fetchOverviewStats(),
+          fetchROI(),
+          fetchCriticalContainers(5),
+          fetchTrends()
+        ]);
+        setStats(statsData);
+        setRoi(roiData);
+        setCriticalContainers(containersData);
+        setTrendData(trendResponse);
+      } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const dynamicPieData = [
+    { name: "Critical", value: stats.critical, color: "hsl(0, 72%, 63%)" },
+    { name: "Low Risk", value: stats.lowRisk, color: "hsl(25, 87%, 59%)" },
+    { name: "Clear", value: stats.clear, color: "hsl(140, 60%, 48%)" },
+  ];
 
   return (
     <DashboardLayout title="Overview Dashboard">
@@ -28,10 +62,10 @@ const Index = () => {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <KPICard icon={Package} label="Total Processed" value="14,820" delta="12.3% vs last month" deltaUp variant="blue" />
-          <KPICard icon={AlertTriangle} label="Critical Flagged" value="312" delta="8.1% increase" deltaUp={false} variant="critical" />
-          <KPICard icon={AlertCircle} label="Low Risk" value="1,847" delta="3.2% decrease" deltaUp variant="low" />
-          <KPICard icon={CheckCircle} label="Cleared / Safe" value="12,661" delta="15.4% increase" deltaUp variant="clear" />
+          <KPICard icon={Package} label="Total Processed" value={stats.total.toLocaleString()} delta="Live Data" deltaUp variant="blue" />
+          <KPICard icon={AlertTriangle} label="Critical Flagged" value={stats.critical.toLocaleString()} delta="AI Detected" deltaUp={false} variant="critical" />
+          <KPICard icon={AlertCircle} label="Low Risk" value={stats.lowRisk.toLocaleString()} delta="Monitor" deltaUp variant="low" />
+          <KPICard icon={CheckCircle} label="Cleared / Safe" value={stats.clear.toLocaleString()} delta="Safe" deltaUp variant="clear" />
         </div>
 
         {/* ROI Card */}
@@ -48,17 +82,17 @@ const Index = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Hours Saved This Month</p>
-              <p className="text-xl font-bold font-mono-data text-foreground">1,240 hrs</p>
+              <p className="text-xl font-bold font-mono-data text-foreground">{roi.hoursSaved.toLocaleString(undefined, { maximumFractionDigits: 0 })} hrs</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Wage Cost Avoided</p>
-              <p className="text-xl font-bold font-mono-data text-foreground">$62,000</p>
+              <p className="text-xl font-bold font-mono-data text-foreground">${roi.wagesSaved.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Random Inspection Avoidance</p>
-              <p className="text-xl font-bold font-mono-data text-risk-clear mb-2">87.3%</p>
+              <p className="text-xl font-bold font-mono-data text-risk-clear mb-2">{roi.avoidanceRate.toFixed(1)}%</p>
               <div className="w-full bg-secondary rounded-full h-2">
-                <div className="bg-risk-clear h-2 rounded-full transition-all" style={{ width: "87.3%" }} />
+                <div className="bg-risk-clear h-2 rounded-full transition-all" style={{ width: `${roi.avoidanceRate}%` }} />
               </div>
             </div>
           </div>
@@ -76,8 +110,8 @@ const Index = () => {
             <h3 className="text-sm font-semibold mb-4 text-foreground">Container Risk Distribution</h3>
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" stroke="none">
-                  {pieData.map((entry, i) => (
+                <Pie data={dynamicPieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" stroke="none">
+                  {dynamicPieData.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
                   ))}
                 </Pie>
@@ -87,7 +121,7 @@ const Index = () => {
               </PieChart>
             </ResponsiveContainer>
             <div className="flex justify-center gap-6 mt-2">
-              {pieData.map(d => (
+              {dynamicPieData.map(d => (
                 <div key={d.name} className="flex items-center gap-2 text-xs">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} />
                   <span className="text-muted-foreground">{d.name}: {d.value.toLocaleString()}</span>
@@ -105,7 +139,7 @@ const Index = () => {
           >
             <h3 className="text-sm font-semibold mb-4 text-foreground">Weekly Risk Trend (Last 12 Weeks)</h3>
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={weeklyTrend}>
+              <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(215, 14%, 18%)" />
                 <XAxis dataKey="week" tick={{ fill: "hsl(215, 10%, 58%)", fontSize: 11 }} />
                 <YAxis tick={{ fill: "hsl(215, 10%, 58%)", fontSize: 11 }} />

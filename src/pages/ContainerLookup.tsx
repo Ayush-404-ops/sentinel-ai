@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RiskBadge } from "@/components/dashboard/RiskBadge";
-import { containers } from "@/data/mockData";
+import { fetchContainerLookup } from "@/lib/apiClient";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,20 +8,31 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 
 
 const ContainerLookup = () => {
   const [query, setQuery] = useState("");
-  const [result, setResult] = useState<typeof containers[0] | null>(null);
+  const [result, setResult] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSearch = () => {
-    const found = containers.find(c => c.id.toLowerCase() === query.toLowerCase());
-    setResult(found || null);
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const data = await fetchContainerLookup(query.trim());
+      setResult(data);
+    } catch (err: any) {
+      console.error(err);
+      setError("Container not found");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const shapFactors = result ? [
-    { factor: "Weight Discrepancy", value: Math.min(result.weightDiscrepancy / 60, 1) * 0.82, positive: true },
-    { factor: "Late Night Decl.", value: result.shipmentDate.includes("0") ? 0.54 : 0.1, positive: true },
+    { factor: "XGBoost Probability", value: result.xgboostProb, positive: true },
+    { factor: "Anomaly Score", value: result.anomalyScore, positive: result.anomalyScore < 0 },
+    { factor: "Weight Discrepancy", value: Math.min(Math.abs(result.weightDiscrepancy) / 60, 1) * 0.82, positive: Math.abs(result.weightDiscrepancy) > 10 },
     { factor: "Dwell Time", value: Math.min(result.dwellTime / 15, 1) * 0.41, positive: result.dwellTime > 5 },
-    { factor: "Shipper Risk", value: result.shipperRiskRate / 100 * 0.33, positive: result.shipperRiskRate > 30 },
-    { factor: "Value-per-KG", value: result.valuePerKg < 5 ? 0.22 : -0.15, positive: result.valuePerKg < 5 },
-    { factor: "Country Risk", value: result.countryRiskRate / 100 * 0.18, positive: result.countryRiskRate > 20 },
   ].sort((a, b) => Math.abs(b.value) - Math.abs(a.value)) : [];
 
   return (
@@ -42,9 +53,10 @@ const ContainerLookup = () => {
           </div>
           <button
             onClick={handleSearch}
-            className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+            disabled={loading}
+            className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
-            Analyze
+            {loading ? "Searching..." : "Analyze"}
           </button>
         </div>
 
@@ -57,10 +69,9 @@ const ContainerLookup = () => {
               className="grid grid-cols-1 lg:grid-cols-2 gap-4"
             >
               {/* Detail Card */}
-              <div className={`bg-card border rounded-lg p-6 space-y-4 ${
-                result.riskLevel === "Critical" ? "border-l-4 border-l-risk-critical glow-critical" :
-                result.riskLevel === "Low Risk" ? "border-l-4 border-l-risk-low" : "border-l-4 border-l-risk-clear"
-              }`}>
+              <div className={`bg-card border rounded-lg p-6 space-y-4 ${result.riskLevel === "Critical" ? "border-l-4 border-l-risk-critical glow-critical" :
+                  result.riskLevel === "Low Risk" ? "border-l-4 border-l-risk-low" : "border-l-4 border-l-risk-clear"
+                }`}>
                 <div className="flex items-center justify-between">
                   <span className="font-mono-data text-sm text-chart-blue">{result.id}</span>
                   <RiskBadge level={result.riskLevel} />
@@ -76,16 +87,12 @@ const ContainerLookup = () => {
                   <Row label="Discrepancy" value={`+${result.weightDiscrepancy}%`} warn={result.weightDiscrepancy > 10} />
                   <div className="border-t border-border pt-2" />
                   <Row label="Declared Value" value={`$${result.declaredValue.toLocaleString()}`} />
-                  <Row label="Value per KG" value={`$${result.valuePerKg.toFixed(2)}`} />
                   <div className="border-t border-border pt-2" />
                   <Row label="Shipper" value={result.shipper} />
-                  <Row label="Importer" value={result.importer} />
-                  <Row label="Shipment Date" value={result.shipmentDate} />
-                  <Row label="Dwell Time" value={`${result.dwellTime} days`} warn={result.dwellTime > 7} />
+                  <Row label="Dwell Time" value={`${result.dwellTime.toFixed(1)} days`} warn={result.dwellTime > 7} />
                   <div className="border-t border-border pt-2" />
-                  <Row label="Shipper Risk Rate" value={`${result.shipperRiskRate}%`} warn={result.shipperRiskRate > 50} />
-                  <Row label="Country Risk Rate" value={`${result.countryRiskRate}%`} warn={result.countryRiskRate > 40} />
-                  <Row label="HS Code Risk Rate" value={`${result.hsRiskRate}%`} />
+                  <Row label="Is Anomaly" value={result.isAnomaly ? "Yes" : "No"} warn={result.isAnomaly} />
+                  <Row label="ML Confidence" value={`${(result.xgboostProb * 100).toFixed(1)}%`} />
                 </div>
 
                 {/* Weight comparison bar */}
@@ -129,11 +136,7 @@ const ContainerLookup = () => {
 
                 <div className="bg-secondary/50 border border-border rounded-md p-4 text-xs leading-relaxed text-foreground">
                   <p>
-                    This container was flagged as <strong>{result.riskLevel}</strong> primarily due to a{" "}
-                    <strong>{result.weightDiscrepancy}%</strong> weight discrepancy between declared (
-                    {result.declaredWeight.toLocaleString()} kg) and measured ({result.measuredWeight.toLocaleString()} kg) weight.
-                    {result.dwellTime > 7 && ` The ${result.dwellTime}-day dwell time is considered excessive.`}
-                    {result.shipperRiskRate > 50 && ` The shipper has a historically high risk rate of ${result.shipperRiskRate}%.`}
+                    {result.explanation || "No AI explanation available for this container."}
                   </p>
                 </div>
               </div>
@@ -141,9 +144,9 @@ const ContainerLookup = () => {
           )}
         </AnimatePresence>
 
-        {!result && query && (
-          <div className="text-center py-16 text-muted-foreground text-sm">
-            No container found with ID "{query}". Try one of: {containers.slice(0, 3).map(c => c.id).join(", ")}
+        {error && !loading && (
+          <div className="text-center py-16 text-risk-critical text-sm">
+            {error}
           </div>
         )}
       </div>

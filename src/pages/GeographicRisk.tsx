@@ -1,8 +1,8 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { countryRiskData } from "@/data/mockData";
+import { fetchGeographicRisk } from "@/lib/apiClient";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import { motion } from "framer-motion";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 const RiskGlobe3D = lazy(() => import("@/components/3d/RiskGlobe3D"));
 
@@ -26,7 +26,17 @@ const getColor = (pct: number) => {
 };
 
 const GeographicRisk = () => {
-  const sorted = [...countryRiskData].sort((a, b) => b.pct - a.pct);
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchGeographicRisk()
+      .then(setData)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const sorted = [...data].sort((a, b) => b.pct - a.pct);
 
   return (
     <DashboardLayout title="Geographic Risk Analysis">
@@ -43,18 +53,22 @@ const GeographicRisk = () => {
         >
           <h3 className="text-sm font-semibold text-foreground mb-4">Global Risk Concentration by Country</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {sorted.map(c => (
-              <div
-                key={c.country}
-                className="bg-secondary/50 border border-border rounded-lg p-3 text-center card-hover"
-                style={{ borderLeftColor: getColor(c.pct), borderLeftWidth: 3 }}
-              >
-                <div className="text-2xl mb-1">{c.flag}</div>
-                <div className="text-xs font-medium text-foreground">{c.country}</div>
-                <div className="font-mono-data text-lg font-bold mt-1" style={{ color: getColor(c.pct) }}>{c.pct}%</div>
-                <div className="text-[10px] text-muted-foreground">{c.count} containers</div>
-              </div>
-            ))}
+            {loading ? (
+              <div className="col-span-full text-center py-8 text-muted-foreground">Loading geographic data...</div>
+            ) : (
+              sorted.map(c => (
+                <div
+                  key={c.country}
+                  className="bg-secondary/50 border border-border rounded-lg p-3 text-center card-hover"
+                  style={{ borderLeftColor: getColor(c.pct), borderLeftWidth: 3 }}
+                >
+                  <div className="text-2xl mb-1">{c.flag}</div>
+                  <div className="text-xs font-medium text-foreground">{c.country}</div>
+                  <div className="font-mono-data text-lg font-bold mt-1" style={{ color: getColor(c.pct) }}>{c.pct.toFixed(1)}%</div>
+                  <div className="text-[10px] text-muted-foreground">{c.count} containers</div>
+                </div>
+              ))
+            )}
           </div>
         </motion.div>
 

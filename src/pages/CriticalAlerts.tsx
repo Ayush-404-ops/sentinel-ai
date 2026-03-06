@@ -1,12 +1,22 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RiskBadge } from "@/components/dashboard/RiskBadge";
-import { containers, type RiskLevel } from "@/data/mockData";
-import { useState } from "react";
+import { type RiskLevel, type Container } from "@/data/mockData";
+import { fetchCriticalContainers } from "@/lib/apiClient";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
 const CriticalAlerts = () => {
   const [filterLevel, setFilterLevel] = useState<RiskLevel | "All">("All");
   const [search, setSearch] = useState("");
+  const [containers, setContainers] = useState<Container[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCriticalContainers(100)
+      .then(setContainers)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = containers.filter(c => {
     if (filterLevel !== "All" && c.riskLevel !== filterLevel) return false;
@@ -45,63 +55,66 @@ const CriticalAlerts = () => {
         </div>
 
         {/* Cards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filtered.map((c, i) => (
-            <motion.div
-              key={c.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className={`bg-card border rounded-lg p-5 card-hover ${
-                c.riskLevel === "Critical" ? "border-l-4 border-l-risk-critical glow-critical" :
-                c.riskLevel === "Low Risk" ? "border-l-4 border-l-risk-low" : "border-l-4 border-l-risk-clear"
-              }`}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <RiskBadge level={c.riskLevel} />
-                <span className="font-mono-data text-xs text-muted-foreground">Score: {c.riskScore}/100</span>
-              </div>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Container ID:</span>
-                  <span className="font-mono-data text-xs text-chart-blue">{c.id}</span>
+        {loading ? (
+          <div className="text-center py-16 text-muted-foreground">Loading critical alerts...</div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filtered.map((c, i) => (
+              <motion.div
+                key={c.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className={`bg-card border rounded-lg p-5 card-hover ${c.riskLevel === "Critical" ? "border-l-4 border-l-risk-critical glow-critical" :
+                    c.riskLevel === "Low Risk" ? "border-l-4 border-l-risk-low" : "border-l-4 border-l-risk-clear"
+                  }`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <RiskBadge level={c.riskLevel} />
+                  <span className="font-mono-data text-xs text-muted-foreground">Score: {c.riskScore}/100</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Origin:</span>
-                  <span>{c.originFlag} {c.origin}</span>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Container ID:</span>
+                    <span className="font-mono-data text-xs text-chart-blue">{c.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Origin:</span>
+                    <span>{c.originFlag} {c.origin}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">HS Code:</span>
+                    <span className="font-mono-data text-xs">{c.hsCode} — {c.hsDesc}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Declared Wt:</span>
+                    <span className="font-mono-data text-xs">{c.declaredWeight.toLocaleString()} kg</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Measured Wt:</span>
+                    <span className="font-mono-data text-xs">
+                      {c.measuredWeight.toLocaleString()} kg
+                      {c.weightDiscrepancy > 10 && <span className="text-risk-critical ml-1">⚠️ +{c.weightDiscrepancy}%</span>}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Shipper:</span>
+                    <span className="text-xs">{c.shipper}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Dwell Time:</span>
+                    <span className="font-mono-data text-xs">
+                      {c.dwellTime} days
+                      {c.dwellTime > 7 && <span className="text-risk-low ml-1">⚠️ Excessive</span>}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">HS Code:</span>
-                  <span className="font-mono-data text-xs">{c.hsCode} — {c.hsDesc}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Declared Wt:</span>
-                  <span className="font-mono-data text-xs">{c.declaredWeight.toLocaleString()} kg</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Measured Wt:</span>
-                  <span className="font-mono-data text-xs">
-                    {c.measuredWeight.toLocaleString()} kg
-                    {c.weightDiscrepancy > 10 && <span className="text-risk-critical ml-1">⚠️ +{c.weightDiscrepancy}%</span>}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Shipper:</span>
-                  <span className="text-xs">{c.shipper}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Dwell Time:</span>
-                  <span className="font-mono-data text-xs">
-                    {c.dwellTime} days
-                    {c.dwellTime > 7 && <span className="text-risk-low ml-1">⚠️ Excessive</span>}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             No containers match your current filters.
           </div>

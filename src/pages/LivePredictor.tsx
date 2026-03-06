@@ -3,6 +3,7 @@ import { RiskBadge } from "@/components/dashboard/RiskBadge";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { RiskLevel } from "@/data/mockData";
+import { fetchContainerPredict } from "@/lib/apiClient";
 
 interface FormData {
   containerId: string;
@@ -32,6 +33,7 @@ const LivePredictor = () => {
     declaredValue: "", shipmentDate: "", dwellTime: "", shipperId: "", importerId: "",
   });
   const [prediction, setPrediction] = useState<Prediction | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const update = (key: keyof FormData, value: string) => setForm(prev => ({ ...prev, [key]: value }));
 
@@ -42,44 +44,23 @@ const LivePredictor = () => {
   const hour = form.shipmentDate ? new Date(form.shipmentDate).getHours() : -1;
   const isLateNight = hour >= 22 || (hour >= 0 && hour < 5);
 
-  const predict = () => {
-    let score = 0;
-    const factors: string[] = [];
-
-    if (Math.abs(discrepancy) > 20) { score += 35; factors.push(`Weight Discrepancy: +${discrepancy.toFixed(1)}%`); }
-    else if (Math.abs(discrepancy) > 10) { score += 15; factors.push(`Weight Discrepancy: +${discrepancy.toFixed(1)}%`); }
-
-    if (isLateNight) { score += 15; factors.push("Late-Night Declaration"); }
-
-    const dwell = parseFloat(form.dwellTime) || 0;
-    if (dwell > 10) { score += 20; factors.push(`Excessive Dwell Time: ${dwell}d`); }
-    else if (dwell > 6) { score += 10; factors.push(`Elevated Dwell Time: ${dwell}d`); }
-
-    if (valuePerKg < 2 && declW > 0) { score += 10; factors.push("Low Value-per-KG"); }
-
-    score += Math.random() * 10;
-    score = Math.min(100, Math.max(0, score));
-
-    const riskLevel: RiskLevel = score > 70 ? "Critical" : score > 35 ? "Low Risk" : "Clear";
-
-    setPrediction({
-      riskLevel,
-      confidence: Math.min(99, score + Math.random() * 5),
-      xgboostScore: score / 100,
-      anomalyScore: score > 60 ? -(Math.random() * 0.4 + 0.1) : Math.random() * 0.2,
-      factors,
-      recommendation: score > 70
-        ? "⚠️ Flag for physical inspection immediately"
-        : score > 35
-        ? "📋 Schedule for secondary review"
-        : "✅ Clear for processing",
-    });
+  const predict = async () => {
+    setLoading(true);
+    try {
+      const result = await fetchContainerPredict(form);
+      setPrediction(result);
+    } catch (error) {
+      console.error("Failed to fetch prediction:", error);
+      // Fallback or error state could be handled here
+    } finally {
+      setLoading(false);
+    }
   };
 
   const glowClass = prediction
     ? prediction.riskLevel === "Critical" ? "glow-critical border-risk-critical/30"
-    : prediction.riskLevel === "Low Risk" ? "glow-low border-risk-low/30"
-    : "glow-clear border-risk-clear/30"
+      : prediction.riskLevel === "Low Risk" ? "glow-low border-risk-low/30"
+        : "glow-clear border-risk-clear/30"
     : "";
 
   return (
@@ -130,9 +111,10 @@ const LivePredictor = () => {
 
           <button
             onClick={predict}
-            className="w-full py-3 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors"
+            disabled={loading}
+            className="w-full py-3 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
-            🔍 Predict Risk Level
+            {loading ? "Predicting..." : "🔍 Predict Risk Level"}
           </button>
         </div>
 
