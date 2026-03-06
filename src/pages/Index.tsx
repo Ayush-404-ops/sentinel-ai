@@ -5,6 +5,9 @@ import { containers, weeklyTrend } from "@/data/mockData";
 import { Package, AlertTriangle, AlertCircle, CheckCircle, DollarSign } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { motion } from "framer-motion";
+import { lazy, Suspense } from "react";
+
+const ShippingContainer3D = lazy(() => import("@/components/3d/ShippingContainer3D"));
 
 const pieData = [
   { name: "Critical", value: 312, color: "hsl(0, 72%, 63%)" },
@@ -18,6 +21,11 @@ const Index = () => {
   return (
     <DashboardLayout title="Overview Dashboard">
       <div className="space-y-6">
+        {/* 3D Container Hero */}
+        <Suspense fallback={<div className="w-full h-[320px] rounded-lg bg-card border border-border animate-pulse" />}>
+          <ShippingContainer3D />
+        </Suspense>
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <KPICard icon={Package} label="Total Processed" value="14,820" delta="12.3% vs last month" deltaUp variant="blue" />

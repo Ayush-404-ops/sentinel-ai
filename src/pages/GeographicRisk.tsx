@@ -1,7 +1,10 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { countryRiskData } from "@/data/mockData";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, Treemap } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import { motion } from "framer-motion";
+import { lazy, Suspense } from "react";
+
+const RiskGlobe3D = lazy(() => import("@/components/3d/RiskGlobe3D"));
 
 const hsCodeRisk = [
   { name: "71 - Gold/Precious", size: 72, pct: 72 },
@@ -28,6 +31,10 @@ const GeographicRisk = () => {
   return (
     <DashboardLayout title="Geographic Risk Analysis">
       <div className="space-y-6">
+        {/* 3D Globe */}
+        <Suspense fallback={<div className="w-full h-[420px] rounded-lg bg-card border border-border animate-pulse" />}>
+          <RiskGlobe3D />
+        </Suspense>
         {/* World Risk Overview */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
