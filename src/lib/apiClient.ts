@@ -14,8 +14,19 @@ export const fetchROI = async () => {
   return res.json();
 };
 
-export const fetchCriticalContainers = async (limit: number = 50): Promise<Container[]> => {
-  const res = await fetch(`${API_BASE_URL}/containers/critical?limit=${limit}`);
+export const fetchCriticalContainers = async (
+  level: string = "All",
+  search: string = "",
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ total: number, containers: Container[] }> => {
+  const url = new URL(`${API_BASE_URL}/containers/critical`);
+  url.searchParams.append("level", level);
+  url.searchParams.append("search", search);
+  url.searchParams.append("limit", limit.toString());
+  url.searchParams.append("offset", offset.toString());
+
+  const res = await fetch(url.toString());
   if (!res.ok) throw new Error("Failed to fetch critical containers");
   return res.json();
 };
@@ -45,5 +56,28 @@ export const fetchContainerPredict = async (data: any) => {
 export const fetchContainerLookup = async (id: string) => {
   const res = await fetch(`${API_BASE_URL}/containers/${id}`);
   if (!res.ok) throw new Error("Failed to lookup container");
+  return res.json();
+};
+
+export const fetchScoreDistribution = async () => {
+  const res = await fetch(`${API_BASE_URL}/overview/score_distribution`);
+  if (!res.ok) throw new Error("Failed to fetch score distribution");
+  return res.json();
+};
+
+export const fetchHSRates = async () => {
+  const res = await fetch(`${API_BASE_URL}/overview/hs_rates`);
+  if (!res.ok) throw new Error("Failed to fetch HS rates");
+  return res.json();
+};
+
+export const fetchShippingRates = async () => {
+  const res = await fetch(`${API_BASE_URL}/overview/shipping_rates`);
+  if (!res.ok) throw new Error("Failed to fetch shipping rates");
+  return res.json();
+};
+export const fetchModelPerformance = async () => {
+  const res = await fetch(`${API_BASE_URL}/model/performance`);
+  if (!res.ok) throw new Error("Failed to fetch model performance");
   return res.json();
 };

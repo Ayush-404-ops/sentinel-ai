@@ -2,43 +2,49 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { RiskBadge } from "@/components/dashboard/RiskBadge";
 import { type Container } from "@/data/mockData";
-import { fetchOverviewStats, fetchROI, fetchCriticalContainers, fetchTrends } from "@/lib/apiClient";
+import { fetchOverviewStats, fetchROI, fetchCriticalContainers, fetchTrends, fetchScoreDistribution, fetchHSRates, fetchShippingRates, fetchGeographicRisk } from "@/lib/apiClient";
 import { useEffect, useState } from "react";
 import { Package, AlertTriangle, AlertCircle, CheckCircle, DollarSign } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
 import { motion } from "framer-motion";
 import { lazy, Suspense } from "react";
 
 const ShippingContainer3D = lazy(() => import("@/components/3d/ShippingContainer3D"));
 
-const pieData = [
-  { name: "Critical", value: 312, color: "hsl(0, 72%, 63%)" },
-  { name: "Low Risk", value: 1847, color: "hsl(25, 87%, 59%)" },
-  { name: "Clear", value: 12661, color: "hsl(140, 60%, 48%)" },
-];
+// Pie data is now dynamic based on stats
+
 
 const Index = () => {
-  const [stats, setStats] = useState({ total: 0, critical: 0, lowRisk: 0, clear: 0 });
-  const [roi, setRoi] = useState({ hoursSaved: 0, wagesSaved: 0, avoidanceRate: 0 });
+  const [stats, setStats] = useState({ total: 0, critical: 0, lowRisk: 0, clear: 0, anomalies: 0 });
+  const [roi, setRoi] = useState({ hoursSaved: 0, wagesSaved: 0, avoidanceRate: 0, inspectionsReduced: 0, detectionEfficiency: "0x" });
   const [criticalContainers, setCriticalContainers] = useState<Container[]>([]);
-  const [trendData, setTrendData] = useState<any[]>([]);
+  const [scoreDist, setScoreDist] = useState<any[]>([]);
+  const [hsRates, setHSRates] = useState<any[]>([]);
+  const [shippingRates, setShippingRates] = useState<any[]>([]);
+  const [geoRisk, setGeoRisk] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [statsData, roiData, containersData, trendResponse] = await Promise.all([
+        const [statsData, roiData, containersData, scoreData, hsData, shipData, geoData] = await Promise.all([
           fetchOverviewStats(),
           fetchROI(),
-          fetchCriticalContainers(5),
-          fetchTrends()
+          fetchCriticalContainers("Critical", "", 10),
+          fetchScoreDistribution(),
+          fetchHSRates(),
+          fetchShippingRates(),
+          fetchGeographicRisk()
         ]);
         setStats(statsData);
         setRoi(roiData);
-        setCriticalContainers(containersData);
-        setTrendData(trendResponse);
+        setCriticalContainers(containersData.containers);
+        setScoreDist(scoreData);
+        setHSRates(hsData);
+        setShippingRates(shipData);
+        setGeoRisk(geoData);
       } catch (error) {
-        console.error("Failed to load dashboard data:", error);
+        console.error("Dashboard Load Error:", error);
       } finally {
         setLoading(false);
       }
@@ -46,161 +52,227 @@ const Index = () => {
     loadData();
   }, []);
 
-  const dynamicPieData = [
-    { name: "Critical", value: stats.critical, color: "hsl(0, 72%, 63%)" },
-    { name: "Low Risk", value: stats.lowRisk, color: "hsl(25, 87%, 59%)" },
-    { name: "Clear", value: stats.clear, color: "hsl(140, 60%, 48%)" },
+  const heroContainer = criticalContainers[0] || null;
+
+  const distributionData = [
+    { name: "Critical", value: stats.critical, color: "#F85149" },
+    { name: "Low Risk", value: stats.lowRisk, color: "#D29922" },
+    { name: "Clear", value: stats.clear, color: "#3FB950" },
   ];
 
   return (
-    <DashboardLayout title="Overview Dashboard">
-      <div className="space-y-6">
-        {/* 3D Container Hero */}
-        <Suspense fallback={<div className="w-full h-[320px] rounded-lg bg-card border border-border animate-pulse" />}>
-          <ShippingContainer3D />
-        </Suspense>
+    <DashboardLayout title="Risk Intelligence Overview">
+      <div className="flex flex-col gap-6 animate-in fade-in duration-500">
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <KPICard icon={Package} label="Total Processed" value={stats.total.toLocaleString()} delta="Live Data" deltaUp variant="blue" />
-          <KPICard icon={AlertTriangle} label="Critical Flagged" value={stats.critical.toLocaleString()} delta="AI Detected" deltaUp={false} variant="critical" />
-          <KPICard icon={AlertCircle} label="Low Risk" value={stats.lowRisk.toLocaleString()} delta="Monitor" deltaUp variant="low" />
-          <KPICard icon={CheckCircle} label="Cleared / Safe" value={stats.clear.toLocaleString()} delta="Safe" deltaUp variant="clear" />
-        </div>
+        {/* Section 1: 3D HERO */}
+        <section className="relative">
+          <Suspense fallback={<div className="w-full h-[300px] bg-[#161B22] border border-[#21262D] rounded-lg animate-pulse" />}>
+            <ShippingContainer3D
+              containerId={heroContainer?.id}
+              riskScore={heroContainer?.riskScore}
+              riskLevel={heroContainer?.riskLevel}
+            />
+          </Suspense>
+        </section>
 
-        {/* ROI Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-card border border-border rounded-lg p-5"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <DollarSign className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold text-foreground">Projected ROI — Inspection Savings</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Hours Saved This Month</p>
-              <p className="text-xl font-bold font-mono-data text-foreground">{roi.hoursSaved.toLocaleString(undefined, { maximumFractionDigits: 0 })} hrs</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Wage Cost Avoided</p>
-              <p className="text-xl font-bold font-mono-data text-foreground">${roi.wagesSaved.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Random Inspection Avoidance</p>
-              <p className="text-xl font-bold font-mono-data text-risk-clear mb-2">{roi.avoidanceRate.toFixed(1)}%</p>
-              <div className="w-full bg-secondary rounded-full h-2">
-                <div className="bg-risk-clear h-2 rounded-full transition-all" style={{ width: `${roi.avoidanceRate}%` }} />
-              </div>
-            </div>
-          </div>
-        </motion.div>
+        {/* Section 2: KPI CARDS */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <KPICard
+            icon={Package}
+            label="Total Processed"
+            value={loading ? "..." : stats.total.toLocaleString()}
+            delta="▲ Live Data"
+            deltaUp={true}
+            variant="blue"
+          />
+          <KPICard
+            icon={AlertTriangle}
+            label="Critical Containers"
+            value={loading ? "..." : stats.critical.toLocaleString()}
+            delta={stats.critical > 50 ? "▲ High Volume" : "▼ Stability"}
+            deltaUp={stats.critical > 50}
+            variant="critical"
+          />
+          <KPICard
+            icon={AlertCircle}
+            label="Low Risk Units"
+            value={loading ? "..." : stats.lowRisk.toLocaleString()}
+            delta="▲ Active Alert"
+            deltaUp={true}
+            variant="low"
+          />
+          <KPICard
+            icon={CheckCircle}
+            label="Anomalies Caught"
+            value={loading ? "..." : stats.anomalies.toLocaleString()}
+            delta="▲ Model Efficiency"
+            deltaUp={true}
+            variant="blue"
+          />
+        </section>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Donut */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-card border border-border rounded-lg p-5"
-          >
-            <h3 className="text-sm font-semibold mb-4 text-foreground">Container Risk Distribution</h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={dynamicPieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" stroke="none">
-                  {dynamicPieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: "hsl(215, 22%, 11%)", border: "1px solid hsl(215, 14%, 18%)", borderRadius: "6px", color: "hsl(213, 27%, 92%)" }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex justify-center gap-6 mt-2">
-              {dynamicPieData.map(d => (
-                <div key={d.name} className="flex items-center gap-2 text-xs">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} />
-                  <span className="text-muted-foreground">{d.name}: {d.value.toLocaleString()}</span>
+        {/* Section 3: 5 CHARTS ROW */}
+        <section className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[320px]">
+          {/* Chart 1: Donut */}
+          <div className="bg-[#161B22] border border-[#21262D] rounded-lg p-4 flex flex-col h-full">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Risk Distribution</h3>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={distributionData} innerRadius="60%" outerRadius="85%" dataKey="value" stroke="none">
+                    {distributionData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: '#0D1117', border: '1px solid #21262D', color: '#fff' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 flex flex-col gap-1">
+              {distributionData.map(d => (
+                <div key={d.name} className="flex items-center justify-between text-[10px]">
+                  <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full" style={{ background: d.color }} /> {d.name}</div>
+                  <span className="font-mono-data opacity-60">{stats.total > 0 ? ((d.value / stats.total) * 100).toFixed(1) : 0}%</span>
                 </div>
               ))}
             </div>
-          </motion.div>
+          </div>
 
-          {/* Trend */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-card border border-border rounded-lg p-5"
-          >
-            <h3 className="text-sm font-semibold mb-4 text-foreground">Weekly Risk Trend (Last 12 Weeks)</h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215, 14%, 18%)" />
-                <XAxis dataKey="week" tick={{ fill: "hsl(215, 10%, 58%)", fontSize: 11 }} />
-                <YAxis tick={{ fill: "hsl(215, 10%, 58%)", fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "hsl(215, 22%, 11%)", border: "1px solid hsl(215, 14%, 18%)", borderRadius: "6px", color: "hsl(213, 27%, 92%)" }} />
-                <Line type="monotone" dataKey="critical" stroke="hsl(0, 72%, 63%)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="low" stroke="hsl(25, 87%, 59%)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="clear" stroke="hsl(140, 60%, 48%)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-            <div className="flex justify-center gap-6 mt-2">
-              <div className="flex items-center gap-2 text-xs"><span className="h-2 w-4 rounded bg-risk-critical" /> <span className="text-muted-foreground">Critical</span></div>
-              <div className="flex items-center gap-2 text-xs"><span className="h-2 w-4 rounded bg-risk-low" /> <span className="text-muted-foreground">Low Risk</span></div>
-              <div className="flex items-center gap-2 text-xs"><span className="h-2 w-4 rounded bg-risk-clear" /> <span className="text-muted-foreground">Clear</span></div>
+          {/* Chart 2: Top Origins */}
+          <div className="bg-[#161B22] border border-[#21262D] rounded-lg p-4 flex flex-col h-full">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Top Origin Flags</h3>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={geoRisk.slice(0, 10)} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="country" type="category" tick={{ fill: "#8B949E", fontSize: 11 }} width={30} axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{ fill: '#21262D' }} contentStyle={{ background: '#0D1117', border: '1px solid #21262D' }} />
+                  <Bar dataKey="count" fill="#F85149" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          </motion.div>
-        </div>
+          </div>
 
-        {/* Recent Table */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-card border border-border rounded-lg overflow-hidden"
-        >
-          <div className="p-5 border-b border-border">
-            <h3 className="text-sm font-semibold text-foreground">Recent High-Risk Containers</h3>
+          {/* Chart 3: Score Distribution (LOG) */}
+          <div className="bg-[#161B22] border border-[#21262D] rounded-lg p-4 flex flex-col h-full">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Risk Score Log Map</h3>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={scoreDist}>
+                  <CartesianGrid vertical={false} stroke="#21262D" strokeDasharray="3 3" />
+                  <XAxis dataKey="bin" tick={{ fill: "#8B949E", fontSize: 10 }} ticks={[5, 20, 35, 50, 65, 80, 95]} />
+                  <YAxis scale="log" domain={['auto', 'auto']} tick={{ fill: "#8B949E", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: '#0D1117', border: '1px solid #21262D' }} />
+                  <Bar dataKey="Clear" fill="#3FB950" stackId="a" />
+                  <Bar dataKey="Critical" fill="#F85149" stackId="a" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Container ID</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Origin</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">HS Code</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Risk Score</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Risk Level</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Flagged Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {criticalContainers.map(c => (
-                  <tr key={c.id} className="border-b border-border/50 hover:bg-primary/5 transition-colors">
-                    <td className="px-5 py-3 font-mono-data text-xs text-chart-blue">{c.id}</td>
-                    <td className="px-5 py-3">{c.originFlag} {c.origin}</td>
-                    <td className="px-5 py-3 font-mono-data text-xs">{c.hsCode}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono-data text-xs font-semibold">{c.riskScore}</span>
-                        <div className="w-16 bg-secondary rounded-full h-1.5">
-                          <div className="bg-risk-critical h-1.5 rounded-full" style={{ width: `${c.riskScore}%` }} />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3"><RiskBadge level={c.riskLevel} /></td>
-                    <td className="px-5 py-3 text-xs text-muted-foreground">{c.flaggedReason}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          {/* Chart 4: HS CHAPTERS */}
+          <div className="bg-[#161B22] border border-[#21262D] rounded-lg p-4 flex flex-col h-full">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Risk by HS Chapter</h3>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={hsRates.slice(0, 8)}>
+                  <XAxis dataKey="chapter" tick={{ fill: "#8B949E", fontSize: 10 }} />
+                  <Tooltip labelStyle={{ color: '#F0883E' }} contentStyle={{ background: '#0D1117', border: '1px solid #21262D' }} />
+                  <Bar dataKey="rate" fill="#F0883E" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </motion.div>
+
+          {/* Chart 5: SHIPPING LINES */}
+          <div className="bg-[#161B22] border border-[#21262D] rounded-lg p-4 flex flex-col h-full">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Risk by Ship Line</h3>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={shippingRates.slice(0, 8)}>
+                  <XAxis dataKey="line" tick={{ fill: "#8B949E", fontSize: 9 }} angle={-45} textAnchor="end" height={50} />
+                  <Tooltip contentStyle={{ background: '#0D1117', border: '1px solid #21262D' }} />
+                  <Bar dataKey="rate" fill="#388BFD" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 4: BOTTOM PANELS */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-8">
+          {/* ROI Cards */}
+          <div className="bg-[#161B22] border border-[#21262D] rounded-lg p-6">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🪙</span>
+                <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">Business Impact & ROI</h3>
+              </div>
+              <span className="text-[10px] text-gray-500 font-mono-data">ESTIMATED SAVINGS</span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest">Manhours Saved</span>
+                <p className="text-xl font-bold text-[#3FB950] font-mono-data">{roi.hoursSaved.toLocaleString()} hrs</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest">Wages Saved</span>
+                <p className="text-xl font-bold text-[#3FB950] font-mono-data">${roi.wagesSaved.toLocaleString()}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest">Inspections Reduced</span>
+                <p className="text-xl font-bold text-[#388BFD] font-mono-data">{roi.inspectionsReduced.toLocaleString()}</p>
+              </div>
+              <div className="bg-[#388BFD]/10 border border-[#388BFD]/20 p-3 rounded-lg relative">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest">Detection Index</span>
+                <p className="text-xl font-bold text-[#F0883E] font-mono-data">{roi.detectionEfficiency}</p>
+                <span className="absolute -top-1 -right-1 bg-[#388BFD]/20 text-[8px] px-1 rounded text-[#58A6FF]">Better than Random</span>
+              </div>
+            </div>
+            <p className="mt-8 text-[10px] text-gray-600 italic border-t border-[#21262D] pt-4">
+              * Figures are automated estimates based on recursive analysis of detection strike rates vs random inspection probability.
+            </p>
+          </div>
+
+          {/* Recent High Risk Table */}
+          <div className="bg-[#161B22] border border-[#21262D] rounded-lg overflow-hidden flex flex-col">
+            <div className="p-5 border-b border-[#21262D]">
+              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-white">Recent High-Risk Containers</h3>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {loading ? (
+                <div className="p-10 space-y-4">
+                  {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 bg-gray-800/50 rounded animate-pulse" />)}
+                </div>
+              ) : criticalContainers.length === 0 ? (
+                <div className="h-[200px] flex items-center justify-center text-gray-600 text-sm">No data available</div>
+              ) : (
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-[#0D1117] text-gray-500 uppercase tracking-widest">
+                      <th className="px-5 py-3">ID</th>
+                      <th className="px-4 py-3 text-center">Country</th>
+                      <th className="px-4 py-3 text-center">Score</th>
+                      <th className="px-4 py-3 text-center">Level</th>
+                      <th className="px-5 py-3">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {criticalContainers.map((c, i) => (
+                      <tr key={i} className={`border-b border-[#21262D] hover:bg-white/[0.03] transition-colors ${i % 2 === 0 ? "bg-white/[0.01]" : ""}`}>
+                        <td className="px-5 py-3 font-mono-data text-[#58A6FF]">{c.id}</td>
+                        <td className="px-4 py-3 text-center">{c.origin}</td>
+                        <td className="px-4 py-3 text-center font-mono-data font-bold">{c.riskScore}</td>
+                        <td className="px-4 py-3 text-center"><RiskBadge level={c.riskLevel} /></td>
+                        <td className="px-5 py-3 text-gray-500 truncate max-w-[120px]">{c.explanation}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </section>
+
       </div>
     </DashboardLayout>
   );

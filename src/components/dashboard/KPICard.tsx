@@ -12,17 +12,17 @@ interface KPICardProps {
 }
 
 const variantStyles = {
-  blue: "text-primary border-primary/20",
-  critical: "text-risk-critical border-risk-critical/20 glow-critical",
-  low: "text-risk-low border-risk-low/20",
-  clear: "text-risk-clear border-risk-clear/20",
+  blue: "border-[#21262D]",
+  critical: "border-[#21262D]",
+  low: "border-[#21262D]",
+  clear: "border-[#21262D]",
 };
 
-const iconBg = {
-  blue: "bg-primary/10",
-  critical: "bg-risk-critical/10",
-  low: "bg-risk-low/10",
-  clear: "bg-risk-clear/10",
+const iconColors = {
+  blue: "bg-[#388BFD]/10 text-[#388BFD]",
+  critical: "bg-[#F85149]/10 text-[#F85149]",
+  low: "bg-[#F0883E]/10 text-[#F0883E]",
+  clear: "bg-[#3FB950]/10 text-[#3FB950]",
 };
 
 export function KPICard({ icon: Icon, label, value, delta, deltaUp, variant = "blue" }: KPICardProps) {
@@ -30,21 +30,22 @@ export function KPICard({ icon: Icon, label, value, delta, deltaUp, variant = "b
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
       className={cn(
-        "bg-card border rounded-lg p-5 flex items-start gap-4 card-hover",
+        "bg-[#161B22] border rounded-lg p-5 flex items-center gap-4 transition-all hover:border-[#30363D]",
         variantStyles[variant]
       )}
     >
-      <div className={cn("p-2.5 rounded-lg", iconBg[variant])}>
+      <div className={cn("p-3 rounded-full flex-shrink-0", iconColors[variant])}>
         <Icon className="h-5 w-5" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
-        <p className="text-2xl font-bold font-mono-data text-foreground">{value}</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">{label}</p>
+        <p className="text-2xl font-bold font-mono-data text-white leading-none">{value}</p>
         {delta && (
-          <p className={cn("text-xs mt-1 font-medium", deltaUp ? "text-risk-clear" : "text-risk-critical")}>
-            {deltaUp ? "▲" : "▼"} {delta}
+          <p className={cn("text-[10px] mt-2 font-semibold flex items-center gap-1",
+            deltaUp ? "text-[#3FB950]" : "text-[#F85149]"
+          )}>
+            {delta}
           </p>
         )}
       </div>
