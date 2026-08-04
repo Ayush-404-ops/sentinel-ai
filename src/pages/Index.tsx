@@ -8,6 +8,7 @@ import { Package, AlertTriangle, AlertCircle, CheckCircle, DollarSign } from "lu
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
 import { motion } from "framer-motion";
 import { lazy, Suspense } from "react";
+import type { ChapterRiskRate, GeographicRiskPoint, ScoreDistributionPoint, ShippingRiskRate } from "@/lib/apiTypes";
 
 const ShippingContainer3D = lazy(() => import("@/components/3d/ShippingContainer3D"));
 
@@ -18,10 +19,10 @@ const Index = () => {
   const [stats, setStats] = useState({ total: 0, critical: 0, lowRisk: 0, clear: 0, anomalies: 0 });
   const [roi, setRoi] = useState({ hoursSaved: 0, wagesSaved: 0, avoidanceRate: 0, inspectionsReduced: 0, detectionEfficiency: "0x" });
   const [criticalContainers, setCriticalContainers] = useState<Container[]>([]);
-  const [scoreDist, setScoreDist] = useState<any[]>([]);
-  const [hsRates, setHSRates] = useState<any[]>([]);
-  const [shippingRates, setShippingRates] = useState<any[]>([]);
-  const [geoRisk, setGeoRisk] = useState<any[]>([]);
+  const [scoreDist, setScoreDist] = useState<ScoreDistributionPoint[]>([]);
+  const [hsRates, setHSRates] = useState<ChapterRiskRate[]>([]);
+  const [shippingRates, setShippingRates] = useState<ShippingRiskRate[]>([]);
+  const [geoRisk, setGeoRisk] = useState<GeographicRiskPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

@@ -15,42 +15,11 @@ import {
   Package,
   Loader2
 } from "lucide-react";
-import type { RiskLevel } from "@/data/mockData";
 import { fetchContainerPredict } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+import type { PredictionRequest, PredictionResponse } from "@/lib/apiTypes";
 
-interface RiskFactor {
-  severity: "Critical" | "Warning" | "Info";
-  factor: string;
-  detail: string;
-}
-
-interface Prediction {
-  riskLevel: RiskLevel;
-  confidence: number;
-  xgboostScore: number;
-  anomalyScore: number;
-  probabilities: {
-    Critical: number;
-    "Low Risk": number;
-    Clear: number;
-  };
-  riskFactors: RiskFactor[];
-  recommendation: string;
-}
-
-interface FormData {
-  containerId: string;
-  origin: string;
-  hsCode: string;
-  declaredWeight: string;
-  measuredWeight: string;
-  declaredValue: string;
-  shipmentDate: string;
-  dwellTime: string;
-  shipperId: string;
-  importerId: string;
-}
+type FormData = PredictionRequest;
 
 const LivePredictor = () => {
   const [form, setForm] = useState<FormData>({
@@ -68,7 +37,7 @@ const LivePredictor = () => {
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [loading, setLoading] = useState(false);
-  const [prediction, setPrediction] = useState<Prediction | null>(null);
+  const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
 
   const update = (key: keyof FormData, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));

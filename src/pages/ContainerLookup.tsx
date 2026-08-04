@@ -5,10 +5,11 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
+import type { ContainerLookupResponse } from "@/lib/apiTypes";
 
 const ContainerLookup = () => {
   const [query, setQuery] = useState("");
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<ContainerLookupResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,7 +21,7 @@ const ContainerLookup = () => {
     try {
       const data = await fetchContainerLookup(query.trim());
       setResult(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setError("Container not found");
     } finally {

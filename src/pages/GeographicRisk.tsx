@@ -3,6 +3,7 @@ import { fetchGeographicRisk } from "@/lib/apiClient";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import { motion } from "framer-motion";
 import { lazy, Suspense, useEffect, useState } from "react";
+import type { GeographicRiskPoint } from "@/lib/apiTypes";
 
 const RiskGlobe3D = lazy(() => import("@/components/3d/RiskGlobe3D"));
 
@@ -26,7 +27,7 @@ const getColor = (pct: number) => {
 };
 
 const GeographicRisk = () => {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<GeographicRiskPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

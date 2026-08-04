@@ -1,6 +1,7 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RiskBadge } from "@/components/dashboard/RiskBadge";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
@@ -32,6 +33,7 @@ import {
 } from "@/lib/apiClient";
 import type { Container } from "@/data/mockData";
 import { cn } from "@/lib/utils";
+import type { ModelPerformance } from "@/lib/apiTypes";
 import {
   BarChart,
   Bar,
@@ -50,6 +52,30 @@ import {
 
 type Tab = "historical" | "export" | "performance";
 
+interface ReportFilters {
+  search: string;
+  level: string;
+  origin: string;
+  from: string;
+  to: string;
+}
+
+interface ExportHistoryItem {
+  id: number;
+  icon: ReactNode;
+  name: string;
+  date: string;
+  size: string;
+}
+
+const defaultFilters: ReportFilters = {
+  search: "",
+  level: "All",
+  origin: "All",
+  from: "",
+  to: "",
+};
+
 const DataReports = () => {
   const [activeTab, setActiveTab] = useState<Tab>("historical");
   const [loading, setLoading] = useState(true);
@@ -57,20 +83,15 @@ const DataReports = () => {
   // Tab 1: Historical Data State
   const [containers, setContainers] = useState<Container[]>([]);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [filters, setFilters] = useState({
-    search: "",
-    level: "All",
-    origin: "All",
-    from: "",
-    to: ""
-  });
+  const [filters, setFilters] = useState<ReportFilters>(defaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState<ReportFilters>(defaultFilters);
   const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 54000 });
 
   // Tab 2: Export State
   const [selectedFormat, setSelectedFormat] = useState("CSV");
   const [isGenerating, setIsGenerating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [exportHistory, setExportHistory] = useState([
+  const [exportHistory, setExportHistory] = useState<ExportHistoryItem[]>([
     { id: 1, icon: <FileSpreadsheet className="text-[#3FB950]" />, name: "March_Risk_Analysis.csv", date: "Today, 09:42 AM", size: "2.4 MB" },
     { id: 2, icon: <Activity className="text-[#F0883E]" />, name: "Quarterly_Report_Q1.xlsx", date: "Yesterday, 04:15 PM", size: "4.8 MB" },
     { id: 3, icon: <FileJson className="text-[#F85149]" />, name: "Critical_Incidents_Log.pdf", date: "05 Mar 2024", size: "1.2 MB" },
@@ -89,7 +110,7 @@ const DataReports = () => {
     // Simulate generation duration
     await new Promise(r => setTimeout(r, 2000));
 
-    const newExport = {
+    const newExport: ExportHistoryItem = {
       id: Date.now(),
       name: `Risk_Report_${new Date().toISOString().split('T')[0]}_${Math.floor(Math.random() * 1000)}.${selectedFormat.toLowerCase()}`,
       date: "Just now",
@@ -106,17 +127,18 @@ const DataReports = () => {
   };
 
   // Tab 3: Performance State
-  const [performance, setPerformance] = useState<any>(null);
+  const [performance, setPerformance] = useState<ModelPerformance | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab, pagination.page, pagination.limit]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (activeTab === "historical") {
-        const data = await fetchCriticalContainers(filters.level, filters.search, pagination.limit, (pagination.page - 1) * pagination.limit);
+        const data = await fetchCriticalContainers(
+          appliedFilters.level,
+          appliedFilters.search,
+          pagination.limit,
+          (pagination.page - 1) * pagination.limit
+        );
         setContainers(data.containers);
         setPagination(prev => ({ ...prev, total: data.total }));
       } else if (activeTab === "performance") {
@@ -128,17 +150,21 @@ const DataReports = () => {
     } finally {
       setLoading(false);
     }
+  }, [activeTab, appliedFilters.level, appliedFilters.search, pagination.limit, pagination.page]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleApplyFilters = () => {
+    setAppliedFilters(filters);
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const handleReset = () => {
-    setFilters({
-      search: "",
-      level: "All",
-      origin: "All",
-      from: "",
-      to: ""
-    });
-    setPagination({ ...pagination, page: 1 });
+    setFilters(defaultFilters);
+    setAppliedFilters(defaultFilters);
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
@@ -230,7 +256,7 @@ const DataReports = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={loadData} className="bg-[#1F6FEB] hover:bg-[#388BFD] text-white px-4 py-2 rounded-md text-sm font-bold transition-colors">
+                  <button onClick={handleApplyFilters} className="bg-[#1F6FEB] hover:bg-[#388BFD] text-white px-4 py-2 rounded-md text-sm font-bold transition-colors">
                     Apply Filters
                   </button>
                   <button onClick={handleReset} className="border border-[#21262D] hover:bg-[#21262D] text-gray-400 px-4 py-2 rounded-md text-sm font-bold transition-colors">
@@ -337,13 +363,13 @@ const DataReports = () => {
                       label="From Date"
                       type="date"
                       value={reportConfig.from}
-                      onChange={(e: any) => setReportConfig({ ...reportConfig, from: e.target.value })}
+                      onChange={e => setReportConfig({ ...reportConfig, from: e.target.value })}
                     />
                     <InputField
                       label="To Date"
                       type="date"
                       value={reportConfig.to}
-                      onChange={(e: any) => setReportConfig({ ...reportConfig, to: e.target.value })}
+                      onChange={e => setReportConfig({ ...reportConfig, to: e.target.value })}
                     />
                   </div>
 
@@ -465,7 +491,7 @@ const DataReports = () => {
                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6">Recent Exports</h3>
                 <div className="space-y-3">
                   <AnimatePresence initial={false}>
-                    {exportHistory.map((item: any) => (
+                    {exportHistory.map(item => (
                       <motion.div
                         key={item.id}
                         initial={{ opacity: 0, y: -20 }}
@@ -526,7 +552,7 @@ const DataReports = () => {
                           cursor={{ fill: "rgba(255,255,255,0.05)" }}
                         />
                         <Bar dataKey="importance" radius={[0, 4, 4, 0]}>
-                          {performance?.featureImportance?.map((entry: any, index: number) => (
+                          {performance?.featureImportance?.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={`rgba(88, 166, 255, ${1 - index * 0.05})`} />
                           ))}
                         </Bar>
@@ -573,7 +599,14 @@ const DataReports = () => {
 
 // --- Sub-components ---
 
-const TabButton = ({ active, onClick, icon, label }: any) => (
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+}
+
+const TabButton = ({ active, onClick, icon, label }: TabButtonProps) => (
   <button
     onClick={onClick}
     className={cn(
@@ -679,7 +712,14 @@ const SkeletonRow = () => (
   </tr>
 );
 
-const PerfCard = ({ label, value, color, delay }: any) => (
+interface PerfCardProps {
+  label: string;
+  value: number;
+  color: string;
+  delay: number;
+}
+
+const PerfCard = ({ label, value, color, delay }: PerfCardProps) => (
   <motion.div
     initial={{ opacity: 0, scale: 0.9 }}
     animate={{ opacity: 1, scale: 1 }}
@@ -767,14 +807,23 @@ const ConfusionMatrix = ({ data }: { data: number[][] }) => {
   );
 };
 
-const LegendItem = ({ color, label }: any) => (
+interface LegendItemProps {
+  color: string;
+  label: string;
+}
+
+const LegendItem = ({ color, label }: LegendItemProps) => (
   <div className="flex items-center gap-2">
     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
     <span className="text-[10px] font-bold text-gray-400 whitespace-nowrap">{label}</span>
   </div>
 );
 
-const PageButton = ({ children, active, disabled, onClick }: any) => (
+interface PageButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  active?: boolean;
+}
+
+const PageButton = ({ children, active, disabled, onClick }: PageButtonProps) => (
   <button
     disabled={disabled}
     onClick={onClick}
@@ -787,7 +836,11 @@ const PageButton = ({ children, active, disabled, onClick }: any) => (
   </button>
 );
 
-const InputField = ({ label, ...props }: any) => (
+interface InputFieldProps extends InputHTMLAttributes<HTMLInputElement> {
+  label: string;
+}
+
+const InputField = ({ label, ...props }: InputFieldProps) => (
   <div className="space-y-1.5">
     <label className="text-[10px] font-bold text-gray-500 uppercase mb-1.5 block">{label}</label>
     <input
@@ -797,7 +850,14 @@ const InputField = ({ label, ...props }: any) => (
   </div>
 );
 
-const RiskToggleChip = ({ label, color, active, onClick }: any) => (
+interface RiskToggleChipProps {
+  label: string;
+  color: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+const RiskToggleChip = ({ label, color, active, onClick }: RiskToggleChipProps) => (
   <div
     onClick={onClick}
     className={cn(
@@ -813,7 +873,14 @@ const RiskToggleChip = ({ label, color, active, onClick }: any) => (
   </div>
 );
 
-const FormatButton = ({ icon, label, active, onClick }: any) => (
+interface FormatButtonProps {
+  icon: ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+const FormatButton = ({ icon, label, active, onClick }: FormatButtonProps) => (
   <div
     onClick={onClick}
     className={cn(
@@ -825,7 +892,14 @@ const FormatButton = ({ icon, label, active, onClick }: any) => (
   </div>
 );
 
-const ExportItem = ({ icon, name, date, size }: any) => (
+interface ExportItemProps {
+  icon: ReactNode;
+  name: string;
+  date: string;
+  size: string;
+}
+
+const ExportItem = ({ icon, name, date, size }: ExportItemProps) => (
   <div className="flex items-center justify-between p-3 rounded-md hover:bg-[#1c2330] transition-colors group">
     <div className="flex items-center gap-3">
       <div className="p-2 bg-[#0D1117] rounded border border-[#21262D] group-hover:border-[#21262D]">

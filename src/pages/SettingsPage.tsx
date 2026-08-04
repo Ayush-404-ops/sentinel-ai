@@ -632,7 +632,15 @@ const SecurityPanel = () => {
     { browser: "Safari 17", os: "macOS 14", ip: "49.36.88.15", last: "Yesterday", current: false },
   ];
 
-  const PwdInput = ({ show, setShow, placeholder }: any) => (
+  const PwdInput = ({
+    show,
+    setShow,
+    placeholder,
+  }: {
+    show: boolean;
+    setShow: (show: boolean) => void;
+    placeholder: string;
+  }) => (
     <div className="relative">
       <input type={show ? "text" : "password"} placeholder={placeholder} className={cn(inputCls, "pr-10")} />
       <button onClick={() => setShow(!show)} className="absolute right-3 top-2.5 text-gray-500 hover:text-white transition-colors">
